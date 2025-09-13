@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Whiz Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease;
+        }
+        .card {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease-in-out;
+            position: relative;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
+        .feedback {
+            height: 2.5rem; /* Reserve space to prevent layout shifts */
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 500px;
+        }
+        #settings-scroll-area {
+            max-height: 65vh;
+            overflow-y: auto;
+            padding: 0 1rem; /* Add padding for scrollbar space */
+            margin: 0 -1rem; /* Compensate for padding to maintain alignment */
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0.8;
+            animation: fall 5s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        /* Progress Bar Styles */
+        .progress-bar-container {
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 9999px;
+            height: 0.75rem; /* h-3 */
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar-green {
+            background-color: #10b981; /* emerald-500 */
+            position: absolute;
+            left: 50%;
+            height: 100%;
+            transition: width 0.3s ease-in-out;
+        }
+        .progress-bar-red {
+            background-color: #ef4444; /* red-500 */
+            position: absolute;
+            right: 50%;
+            height: 100%;
+            transition: width 0.3s ease-in-out;
+        }
+        /* Circular Timer Styles */
+        #timer-progress {
+            transition: stroke-dashoffset 0.2s linear, stroke 0.3s ease-in-out;
+        }
+        #timer-text {
+            font-family: 'Inter', sans-serif;
+            fill: #4338ca; /* indigo-700 */
+        }
+    </style>
+</head>
+<body class="bg-gray-300 flex flex-col min-h-screen">
+
+    <main class="flex-grow flex items-center justify-center w-full">
+        <!-- Main App Container -->
+        <div class="card w-full max-w-md mx-4 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Math Whiz Game</h1>
+
+            <!-- Start View -->
+            <div id="start-view" class="">
+                <p class="text-lg text-gray-600 my-8">Press Start to begin the challenge!</p>
+                <button id="startGameBtn" class="btn w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Start Game</button>
+            </div>
+            
+            <!-- Game View -->
+            <div id="game-view" class="hidden">
+                <!-- Top Info Bar -->
+                <div class="flex justify-around items-center bg-gray-100 p-3 rounded-lg mb-6 text-lg">
+                    <!-- Level Indicator -->
+                    <div>
+                         <p class="text-2xl font-bold text-gray-700">Level <span id="currentLevel" class="text-indigo-600">1</span></p>
+                    </div>
+                    <!-- Timer Display -->
+                    <div id="timer-display" class="flex flex-col justify-center items-center">
+                        <svg class="w-20 h-20 transform -rotate-90">
+                            <circle class="text-gray-300" stroke-width="7" stroke="currentColor" fill="transparent" r="30" cx="40" cy="40" />
+                            <circle id="timer-progress" class="text-purple-600" stroke-width="7" stroke-linecap="round" stroke="currentColor" fill="transparent" r="30" cx="40" cy="40" />
+                            <text id="timer-text" class="text-xl font-bold" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(90 40 40)">0s</text>
+                        </svg>
+                        <div id="target-time-label" class="text-xs text-gray-500 mt-1"></div>
+                    </div>
+                </div>
+        
+                <!-- Level Progress Bar -->
+                <div class="px-4 mb-4">
+                    <div class="progress-bar-container">
+                        <div id="progressBarRed" class="progress-bar-red"></div>
+                        <div id="progressBarGreen" class="progress-bar-green"></div>
+                    </div>
+                </div>
+
+
+                <!-- Question Display -->
+                <div id="question-band" class="mt-4 mb-6 p-4 rounded-lg border-2 border-dashed">
+                    <p id="question" class="text-4xl font-bold text-gray-800">Ready?</p>
+                </div>
+        
+                <!-- Answer Input -->
+                <div class="mb-4">
+                    <input type="number" id="answer" placeholder="Your answer" class="w-full p-3 text-center text-lg border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" autocomplete="off">
+                </div>
+        
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-1 gap-4">
+                     <button id="checkBtn" class="btn w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Check Answer</button>
+                     <button id="nextBtn" class="btn w-full bg-[#E97132] text-white font-bold py-3 px-4 rounded-md hover:bg-[#d3652b] hidden">Next Question</button>
+                </div>
+        
+                <!-- Feedback Message -->
+                <div id="feedback" class="feedback mt-2 text-xl font-semibold"></div>
+            </div>
+    
+            <!-- Restart Button -->
+            <button id="restartBtn" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
+                </svg>
+            </button>
+            
+            <!-- Settings Button -->
+            <button id="settingsBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+        </div>
+    
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h2 class="text-2xl font-bold mb-6 text-center">Settings</h2>
+                <div id="settings-scroll-area" class="space-y-4">
+                    <div>
+                        <label for="defaultLevel" class="block text-sm font-medium text-gray-700">Default Level</label>
+                        <input type="number" id="defaultLevel" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                     <div>
+                        <label for="scoreCorrect" class="block text-sm font-medium text-gray-700">Points for Correct & Fast</label>
+                        <input type="number" id="scoreCorrect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="transitionTime" class="block text-sm font-medium text-gray-700">Transition Time (seconds)</label>
+                        <input type="number" id="transitionTime" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="pointsWrong" class="block text-sm font-medium text-gray-700">Points Deducted for Wrong Answer</label>
+                        <input type="number" id="pointsWrong" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    
+                    <!-- Timer Settings Group -->
+                    <div class="border-t pt-4 border-gray-200 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Enable/Disable Timer</label>
+                             <div class="mt-2 flex items-center">
+                                <input id="showTimer" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <div class="timer-dependent">
+                            <label for="targetTime" class="block text-sm font-medium text-gray-700">Target Time (seconds)</label>
+                            <input type="number" id="targetTime" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div class="timer-dependent">
+                            <label for="slowFailTime" class="block text-sm font-medium text-gray-700">Slow Fail Time (seconds)</label>
+                            <input type="number" id="slowFailTime" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </div>
+                         <div class="timer-dependent">
+                            <label for="scoreCorrectSlow" class="block text-sm font-medium text-gray-700">Points for Correct & Slow</label>
+                            <input type="number" id="scoreCorrectSlow" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Enabled Operations</label>
+                        <div class="mt-2 space-y-2">
+                            <div class="flex items-center">
+                                <input id="opAddition" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <label for="opAddition" class="ml-2 block text-sm text-gray-900">Addition</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="opSubtraction" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <label for="opSubtraction" class="ml-2 block text-sm text-gray-900">Subtraction</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="opMultiplication" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <label for="opMultiplication" class="ml-2 block text-sm text-gray-900">Multiplication</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="opDivision" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                                <label for="opDivision" class="ml-2 block text-sm text-gray-900">Division</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-4">
+                     <button id="saveSettingsBtn" class="btn bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Save & Restart</button>
+                     <button id="closeSettingsBtn" class="btn bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-md hover:bg-gray-300">Close</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Awesome Modal -->
+        <div id="awesomeModal" class="modal-overlay hidden">
+            <div class="modal-content text-center">
+                <h2 class="text-4xl font-bold mb-4">You are awesome!!! 💪</h2>
+                <button id="closeAwesomeBtn" class="btn bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Keep Going!</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Confetti Container -->
+    <div id="confetti-container" class="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-[100]"></div>
+
+    <footer class="text-center py-4 text-sm text-gray-500">
+        Made with ❤️ by Gaurav Chachra
+    </footer>
+
+
+    <script>
+        // DOM Elements
+        const startView = document.getElementById('start-view');
+        const gameView = document.getElementById('game-view');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const questionEl = document.getElementById('question');
+        const answerEl = document.getElementById('answer');
+        const checkBtn = document.getElementById('checkBtn');
+        const feedbackEl = document.getElementById('feedback');
+        const scoreEl = document.getElementById('score');
+        const currentLevelEl = document.getElementById('currentLevel');
+        const timerDisplayEl = document.getElementById('timer-display');
+        const timerProgressEl = document.getElementById('timer-progress');
+        const timerTextEl = document.getElementById('timer-text');
+        const targetTimeLabelEl = document.getElementById('target-time-label');
+        const nextBtn = document.getElementById('nextBtn');
+        const awesomeModal = document.getElementById('awesomeModal');
+        const closeAwesomeBtn = document.getElementById('closeAwesomeBtn');
+        const confettiContainer = document.getElementById('confetti-container');
+        const progressBarRed = document.getElementById('progressBarRed');
+        const progressBarGreen = document.getElementById('progressBarGreen');
+        
+        // Settings Modal Elements
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+        // Settings Input Elements
+        const settingsInputs = {
+            defaultLevel: document.getElementById('defaultLevel'),
+            targetTime: document.getElementById('targetTime'),
+            slowFailTime: document.getElementById('slowFailTime'),
+            scoreCorrect: document.getElementById('scoreCorrect'),
+            scoreCorrectSlow: document.getElementById('scoreCorrectSlow'),
+            transitionTime: document.getElementById('transitionTime'),
+            pointsWrong: document.getElementById('pointsWrong')
+        };
+        const settingsCheckboxes = {
+            showTimer: document.getElementById('showTimer')
+        };
+        const opCheckboxes = {
+            addition: document.getElementById('opAddition'),
+            subtraction: document.getElementById('opSubtraction'),
+            multiplication: document.getElementById('opMultiplication'),
+            division: document.getElementById('opDivision')
+        };
+        
+        let settings;
+        let correctAnswer, currentLevel, score, startTime, timerInterval, level5Streak, levelProgress;
+        
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('mathWhizSettings');
+            const defaultSettings = {
+                defaultLevel: 1,
+                targetTime: 30,
+                slowFailTime: 60,
+                scoreCorrect: 10,
+                scoreCorrectSlow: 5,
+                transitionTime: 2,
+                pointsWrong: 5,
+                showTimer: true,
+                enabledOps: {
+                    addition: true,
+                    subtraction: true,
+                    multiplication: true,
+                    division: false
+                }
+            };
+            settings = savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+
+            // Ensure old saved settings get the new properties
+            if (settings.showTimer === undefined) {
+                settings.showTimer = defaultSettings.showTimer;
+            }
+            if (!settings.enabledOps) {
+                settings.enabledOps = defaultSettings.enabledOps;
+            }
+            // remove obsolete settings
+            delete settings.upwardSensitivity;
+            delete settings.downwardSensitivity;
+
+
+            // Populate settings modal
+            for (const key in settingsInputs) {
+                if(settingsInputs[key]) settingsInputs[key].value = settings[key];
+            }
+            for (const key in settingsCheckboxes) {
+                settingsCheckboxes[key].checked = settings[key];
+            }
+            for (const op in settings.enabledOps) {
+                if (opCheckboxes[op]) {
+                    opCheckboxes[op].checked = settings.enabledOps[op];
+                }
+            }
+            toggleTimerSettingsVisibility();
+        }
+
+        function saveSettings() {
+            for (const key in settingsInputs) {
+                if(!settingsInputs[key]) continue;
+                const value = parseInt(settingsInputs[key].value);
+                 if (!isNaN(value)) {
+                    settings[key] = value;
+                }
+            }
+            for (const key in settingsCheckboxes) {
+                settings[key] = settingsCheckboxes[key].checked;
+            }
+            for (const op in opCheckboxes) {
+                if (opCheckboxes[op]) {
+                    settings.enabledOps[op] = opCheckboxes[op].checked;
+                }
+            }
+            localStorage.setItem('mathWhizSettings', JSON.stringify(settings));
+            initializeApp();
+            settingsModal.classList.add('hidden');
+        }
+
+        function toggleTimerSettingsVisibility() {
+            const timerDependentFields = document.querySelectorAll('.timer-dependent');
+            const isTimerEnabled = settingsCheckboxes.showTimer.checked;
+
+            timerDependentFields.forEach(field => {
+                if (isTimerEnabled) {
+                    field.classList.remove('hidden');
+                } else {
+                    field.classList.add('hidden');
+                }
+            });
+        }
+
+        function initializeApp() {
+            loadSettings();
+            startView.classList.remove('hidden');
+            gameView.classList.add('hidden');
+            restartBtn.classList.add('hidden');
+            // Reset background color to default
+            const oldColorClasses = ['bg-gray-100', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-red-50', 'bg-blue-100', 'bg-green-100', 'bg-yellow-100', 'bg-red-100', 'bg-gray-200', 'bg-blue-200', 'bg-green-200', 'bg-yellow-200', 'bg-red-200'];
+            document.body.classList.remove(...oldColorClasses);
+            document.body.classList.add('bg-gray-300');
+        }
+
+        function startGame() {
+            startView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+            restartBtn.classList.remove('hidden');
+            
+            if (settings.showTimer) {
+                timerDisplayEl.classList.remove('hidden');
+                targetTimeLabelEl.textContent = `Target - ${settings.targetTime}s`;
+            } else {
+                timerDisplayEl.classList.add('hidden');
+            }
+
+            currentLevel = settings.defaultLevel;
+            score = 0;
+            level5Streak = 0;
+            levelProgress = 0;
+            updateUI();
+            generateQuestion();
+            answerEl.blur(); // Remove focus from the answer field on initial start
+        }
+
+        function updateUI() {
+            // scoreEl is not displayed, but we still calculate it.
+            if(scoreEl) scoreEl.textContent = score; 
+
+            // Update level display
+            currentLevelEl.textContent = currentLevel;
+
+            updateProgressBar();
+
+            // --- Background color logic ---
+            const bodyEl = document.body;
+            const questionBandEl = document.getElementById('question-band');
+            // Define all possible color classes to ensure a clean slate
+            const allPossibleColors = ['bg-gray-50', 'bg-gray-100', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-red-50', 'bg-gray-200', 'bg-blue-100', 'bg-green-100', 'bg-yellow-100', 'bg-red-100', 'bg-gray-300', 'bg-blue-200', 'bg-green-200', 'bg-yellow-200', 'bg-red-200'];
+
+            // Define the new, more saturated colors for each level
+            const levelColors = {
+                1: 'bg-gray-300',
+                2: 'bg-blue-200',
+                3: 'bg-green-200',
+                4: 'bg-yellow-200',
+                5: 'bg-red-200'
+            };
+
+            const currentColor = levelColors[currentLevel] || 'bg-gray-300';
+            
+            // Remove any existing level color classes from body and question band
+            bodyEl.classList.remove(...allPossibleColors);
+            questionBandEl.classList.remove(...allPossibleColors);
+            
+            // Add the class for the current level to both elements
+            bodyEl.classList.add(currentColor);
+            questionBandEl.classList.add(currentColor);
+        }
+        
+        function updateProgressBar() {
+            if (levelProgress > 0) {
+                // The green bar fills half the container, so we divide by 2
+                progressBarGreen.style.width = (levelProgress / 2) + '%';
+                progressBarRed.style.width = '0%';
+            } else {
+                // The red bar fills the other half
+                progressBarRed.style.width = (Math.abs(levelProgress) / 2) + '%';
+                progressBarGreen.style.width = '0%';
+            }
+        }
+
+        function startTimer() {
+            const radius = timerProgressEl.r.baseVal.value;
+            const circumference = 2 * Math.PI * radius;
+            timerProgressEl.style.strokeDasharray = circumference;
+            timerProgressEl.style.strokeDashoffset = circumference;
+            
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                timerTextEl.textContent = `${elapsedTime}s`;
+                
+                const progress = Math.min(elapsedTime / settings.slowFailTime, 1);
+                const offset = circumference - progress * circumference;
+                timerProgressEl.style.strokeDashoffset = offset;
+
+                // Color logic
+                timerProgressEl.classList.remove('text-purple-600', 'text-orange-500', 'text-red-500');
+                if (elapsedTime >= settings.slowFailTime) {
+                    timerProgressEl.classList.add('text-red-500');
+                    handleTimeUp();
+                }
+                 else if (elapsedTime > settings.targetTime) {
+                    timerProgressEl.classList.add('text-orange-500');
+                } else {
+                    timerProgressEl.classList.add('text-purple-600');
+                }
+                
+            }, 1000);
+        }
+
+
+        // --- Question Generation Logic ---
+        function generateQuestion() {
+            const availableOps = Object.keys(settings.enabledOps).filter(op => settings.enabledOps[op]);
+
+            if (availableOps.length === 0) {
+                questionEl.textContent = 'Enable an operation in Settings!';
+                checkBtn.disabled = true;
+                return;
+            }
+
+            const operation = availableOps[getRandomInt(0, availableOps.length - 1)];
+            let num1, num2, questionText;
+
+            switch (operation) {
+                case 'addition':
+                    [num1, num2] = getAdditionNumbers(currentLevel);
+                    correctAnswer = num1 + num2;
+                    questionText = `${num1} + ${num2}`;
+                    break;
+                case 'subtraction':
+                    [num1, num2] = getSubtractionNumbers(currentLevel);
+                    correctAnswer = num1 - num2;
+                    questionText = `${num1} - ${num2}`;
+                    break;
+                case 'multiplication':
+                    [num1, num2] = getMultiplicationNumbers(currentLevel);
+                    correctAnswer = num1 * num2;
+                    questionText = `${num1} x ${num2}`;
+                    break;
+                case 'division':
+                    [num1, num2] = getDivisionNumbers(currentLevel);
+                    correctAnswer = num1 / num2;
+                    questionText = `${num1} ÷ ${num2}`;
+                    break;
+            }
+
+            questionEl.textContent = questionText;
+            answerEl.value = '';
+            feedbackEl.textContent = '';
+            answerEl.disabled = false;
+
+            checkBtn.classList.remove('hidden');
+            checkBtn.disabled = false;
+            checkBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            checkBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            nextBtn.classList.add('hidden');
+
+            answerEl.focus();
+            
+            clearInterval(timerInterval);
+            
+            // Reset circular timer
+            const radius = document.getElementById('timer-progress').r.baseVal.value;
+            const circumference = 2 * Math.PI * radius;
+            timerProgressEl.style.strokeDashoffset = circumference;
+            timerProgressEl.classList.remove('text-orange-500', 'text-red-500');
+            timerProgressEl.classList.add('text-purple-600');
+            timerTextEl.textContent = `0s`;
+
+            if (settings.showTimer) {
+                startTimer();
+            }
+        }
+
+        // --- Answer Checking Logic ---
+        function checkAnswer() {
+            const userAnswer = parseInt(answerEl.value);
+            if (isNaN(userAnswer)) {
+                feedbackEl.textContent = 'Please enter a number.';
+                feedbackEl.className = 'feedback mt-4 text-xl font-semibold text-yellow-600';
+                return;
+            }
+            
+            clearInterval(timerInterval);
+            answerEl.disabled = true;
+            checkBtn.disabled = true;
+            checkBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            checkBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+
+            const responseTime = (Date.now() - startTime) / 1000;
+
+            if (userAnswer === correctAnswer) {
+                handleCorrectAnswer(responseTime);
+            } else {
+                handleIncorrectAnswer();
+            }
+            updateUI();
+        }
+        
+        function handleCorrectAnswer(responseTime) {
+            // If timer is off, always treat as fast.
+            if (!settings.showTimer || responseTime <= settings.targetTime) {
+                // Correct and Fast
+                score += settings.scoreCorrect;
+                feedbackEl.textContent = 'Correct!';
+
+                // Only calculate progress if not at max level
+                if (currentLevel < 5) {
+                    levelProgress = Math.max(0, levelProgress) + 33.34; // Add to positive progress
+
+                    if (levelProgress >= 100) {
+                        currentLevel++;
+                        feedbackEl.textContent += ' Level up!';
+                        levelProgress = 0;
+                    }
+                }
+                
+                // Check for level 5 streak
+                if (currentLevel === 5) {
+                    level5Streak++;
+                    if (level5Streak === 3) {
+                        showConfetti();
+                        awesomeModal.classList.remove('hidden');
+                        level5Streak = 0; // Reset after celebration
+                    }
+                } else {
+                    level5Streak = 0; // Reset if level is not 5
+                }
+
+            } else {
+                // Correct but Slow (counts as wrong for level progress)
+                score += settings.scoreCorrectSlow;
+                level5Streak = 0; // Reset streak on slow answer
+                feedbackEl.textContent = 'Correct, but a bit slow.';
+                
+                if (currentLevel > 1) {
+                    if (levelProgress > 0) {
+                        levelProgress = -50;
+                    } else {
+                        levelProgress -= 50;
+                    }
+
+                    if (levelProgress <= -100) {
+                        currentLevel--;
+                        feedbackEl.textContent = 'Correct, but slow. Level down.';
+                        levelProgress = 0;
+                    }
+                } else {
+                    // At level 1, a slow answer just resets progress, no penalty.
+                    levelProgress = 0;
+                }
+            }
+            
+            feedbackEl.className = 'feedback mt-4 text-xl font-semibold text-green-600';
+            setTimeout(generateQuestion, settings.transitionTime * 1000);
+        }
+
+        function handleIncorrectAnswer() {
+            score = Math.max(0, score - settings.pointsWrong);
+            level5Streak = 0; // Reset streak on incorrect answer
+            
+            let feedbackText = `Not quite. The correct answer was ${correctAnswer}.`;
+            
+            if (currentLevel > 1) {
+                if (levelProgress > 0) {
+                    levelProgress = -50;
+                } else {
+                    levelProgress -= 50;
+                }
+
+                if (levelProgress <= -100) {
+                    currentLevel--;
+                    feedbackText += ' Level down.';
+                    levelProgress = 0;
+                }
+            } else {
+                // At level 1, an incorrect answer just resets progress, no penalty.
+                levelProgress = 0;
+            }
+            
+            feedbackEl.textContent = feedbackText;
+            feedbackEl.className = 'feedback mt-4 text-xl font-semibold text-red-600';
+
+            checkBtn.classList.add('hidden');
+            nextBtn.classList.remove('hidden');
+        }
+        
+        function handleTimeUp() {
+            // This function will only be called if the timer is running.
+            clearInterval(timerInterval);
+            answerEl.disabled = true;
+            checkBtn.disabled = true;
+            checkBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            checkBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+
+            score = Math.max(0, score - settings.pointsWrong);
+            level5Streak = 0; // Reset streak on time up
+
+            let feedbackText = `Time up! The correct answer was ${correctAnswer}.`;
+
+            if (currentLevel > 1) {
+                if (levelProgress > 0) {
+                    levelProgress = -50;
+                } else {
+                    levelProgress -= 50;
+                }
+
+                if (levelProgress <= -100) {
+                    currentLevel--;
+                    feedbackText += ' Level down.';
+                    levelProgress = 0;
+                }
+            } else {
+                // At level 1, a time-up just resets progress, no penalty.
+                levelProgress = 0;
+            }
+
+            feedbackEl.textContent = feedbackText;
+            feedbackEl.className = 'feedback mt-4 text-xl font-semibold text-red-600';
+
+            checkBtn.classList.add('hidden');
+            nextBtn.classList.remove('hidden');
+            updateUI();
+        }
+
+        function showConfetti() {
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = -20 + 'px'; // Start above the screen
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confettiContainer.appendChild(confetti);
+
+                // Clean up confetti elements after animation
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        // --- Utility & Difficulty Functions ---
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        function getAdditionNumbers(level) {
+            let num1, num2;
+            switch(level) {
+                case 1: 
+                    num1 = getRandomInt(1, 9);
+                    num2 = getRandomInt(1, 19);
+                    return Math.random() < 0.5 ? [num1, num2] : [num2, num1];
+                case 2:
+                    num1 = getRandomInt(1, 19);
+                    num2 = getRandomInt(20, 99);
+                    return Math.random() < 0.5 ? [num1, num2] : [num2, num1];
+                case 3:
+                    return [getRandomInt(10, 99), getRandomInt(10, 99)];
+                case 4:
+                    num1 = getRandomInt(10, 99);
+                    num2 = getRandomInt(100, 999);
+                    return Math.random() < 0.5 ? [num1, num2] : [num2, num1];
+                case 5:
+                    return [getRandomInt(100, 999), getRandomInt(100, 999)];
+                default: 
+                    return [1, 1];
+            }
+        }
+        function getSubtractionNumbers(level) {
+            let num1, num2;
+            switch(level) {
+                case 1: // both numbers less than 10
+                    num1 = getRandomInt(1, 9);
+                    num2 = getRandomInt(1, 9);
+                    break;
+                case 2: // one number less than 10, other number between 10 and 20
+                    num1 = getRandomInt(1, 9);
+                    num2 = getRandomInt(10, 19);
+                    break;
+                case 3: // one number less than 20, other number between 20 and 50
+                    num1 = getRandomInt(1, 19);
+                    num2 = getRandomInt(20, 49);
+                    break;
+                case 4: // one number less than 50, other number between 50 and 100
+                    num1 = getRandomInt(1, 49);
+                    num2 = getRandomInt(50, 99);
+                    break;
+                case 5: // both numbers between 10 and 100
+                    num1 = getRandomInt(10, 99);
+                    num2 = getRandomInt(10, 99);
+                    break;
+                default: 
+                    num1 = 5; 
+                    num2 = 2;
+            }
+            // Ensure the result is always positive
+            return num1 > num2 ? [num1, num2] : [num2, num1];
+        }
+        function getMultiplicationNumbers(level) {
+            let num1, num2;
+            switch(level) {
+                case 1: // both numbers single digits less than or equal to 5
+                    return [getRandomInt(2, 5), getRandomInt(2, 5)];
+                case 2: // one number single digit <= 5, other number single digit >= 5
+                    num1 = getRandomInt(2, 5);
+                    num2 = getRandomInt(5, 9);
+                    return Math.random() < 0.5 ? [num1, num2] : [num2, num1];
+                case 3: // one number < 10, other number double digit < 20
+                    num1 = getRandomInt(2, 9);
+                    num2 = getRandomInt(10, 19);
+                    return Math.random() < 0.5 ? [num1, num2] : [num2, num1];
+                case 4: // both numbers double digit < 20
+                    return [getRandomInt(10, 19), getRandomInt(10, 19)];
+                case 5: // both numbers double digits < 50
+                    return [getRandomInt(10, 49), getRandomInt(10, 49)];
+                default: 
+                    return [2, 2];
+            }
+        }
+        function getDivisionNumbers(level) {
+            let dividend, divisor, result;
+            switch(level) {
+                case 1: // one double digit number <= 20, other number single digit
+                    do {
+                        divisor = getRandomInt(2, 9);
+                        result = getRandomInt(2, 10);
+                        dividend = divisor * result;
+                    } while (dividend < 10 || dividend > 20);
+                    return [dividend, divisor];
+                case 2: // one any double digit number <= 50, other number single digit
+                    do {
+                        divisor = getRandomInt(2, 9);
+                        result = getRandomInt(2, 25);
+                        dividend = divisor * result;
+                    } while (dividend < 10 || dividend > 50);
+                    return [dividend, divisor];
+                case 3: // one any double digit number < 100, other number single digit
+                     do {
+                        divisor = getRandomInt(2, 9);
+                        result = getRandomInt(5, 50);
+                        dividend = divisor * result;
+                    } while (dividend < 10 || dividend > 99);
+                    return [dividend, divisor];
+                case 4: // one any double digit number < 100, other number double digit
+                    do {
+                        divisor = getRandomInt(10, 49);
+                        result = getRandomInt(2, 9);
+                        dividend = divisor * result;
+                    } while (dividend > 99);
+                     return [dividend, divisor];
+                case 5: // one three digit number, other 2 digit number
+                    do {
+                        divisor = getRandomInt(10, 99);
+                        result = getRandomInt(2, 50);
+                        dividend = divisor * result;
+                    } while (dividend < 100 || dividend > 999);
+                    return [dividend, divisor];
+                default:
+                    return [12, 4]; // fallback
+            }
+        }
+        // --- Event Listeners ---
+        startGameBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', initializeApp);
+        checkBtn.addEventListener('click', checkAnswer);
+        answerEl.addEventListener('keyup', (event) => { if (event.key === 'Enter') checkAnswer(); });
+        nextBtn.addEventListener('click', () => {
+            generateQuestion();
+            answerEl.blur();
+        });
+        
+        // Settings Modal Listeners
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            toggleTimerSettingsVisibility();
+        });
+        closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        closeAwesomeBtn.addEventListener('click', () => awesomeModal.classList.add('hidden'));
+        settingsCheckboxes.showTimer.addEventListener('change', toggleTimerSettingsVisibility);
+
+        // --- Initial Load ---
+        window.onload = initializeApp;
+    </script></body>
+</html>
+
