@@ -59,11 +59,12 @@
             height: 10px;
             opacity: 0.8;
             animation: fall 5s linear forwards;
+            --fall-x-drift: 0; /* Custom property for horizontal drift */
         }
 
         @keyframes fall {
             to {
-                transform: translateY(100vh) rotate(720deg);
+                transform: translateY(100vh) translateX(var(--fall-x-drift)) rotate(720deg);
                 opacity: 0;
             }
         }
@@ -165,7 +166,7 @@
             <button id="restartBtn" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 9a9 9 G-9 G-9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
                 </svg>
             </button>
             
@@ -269,6 +270,7 @@
 
     <!-- Confetti Container -->
     <div id="confetti-container" class="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-[100]"></div>
+    <div id="pinata-container" class="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-[101]"></div>
 
     <footer class="text-center py-4 text-sm text-gray-500">
         Made with ❤️ by <a href="https://www.linkedin.com/in/gauravchachra/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">Gaurav Chachra</a>
@@ -295,6 +297,7 @@
         const awesomeModal = document.getElementById('awesomeModal');
         const closeAwesomeBtn = document.getElementById('closeAwesomeBtn');
         const confettiContainer = document.getElementById('confetti-container');
+        const pinataContainer = document.getElementById('pinata-container');
         const progressBarRed = document.getElementById('progressBarRed');
         const progressBarGreen = document.getElementById('progressBarGreen');
         const levelChangeModal = document.getElementById('levelChangeModal');
@@ -643,7 +646,8 @@
                         answerEl.disabled = true;
                         checkBtn.disabled = true;
                         
-                        showConfetti();
+                        startPinataAnimation(); // New celebration
+                        
                         closeAwesomeBtn.textContent = 'Restart Game';
                         awesomeModal.classList.remove('hidden');
                         
@@ -756,22 +760,58 @@
             updateUI();
         }
 
-        function showConfetti() {
+        function startPinataAnimation() {
+            if (!pinataContainer) return;
+
+            const pinata = document.createElement('div');
+            pinata.style.position = 'absolute';
+            pinata.style.transition = 'all 1s ease-in-out';
+            pinata.innerHTML = `<svg class="w-24 h-24 text-pink-500 fill-current drop-shadow-lg" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+            pinataContainer.appendChild(pinata);
+
+            pinata.style.left = '50%';
+            pinata.style.top = '50%';
+            pinata.style.transform = 'translate(-50%, -50%) scale(1)';
+
+            let explosions = 0;
+            const explosionInterval = setInterval(() => {
+                if (explosions >= 5) {
+                    clearInterval(explosionInterval);
+                    pinata.style.transform = 'translate(-50%, -50%) scale(0)';
+                    setTimeout(() => pinata.remove(), 500);
+                    return;
+                }
+
+                const rect = pinata.getBoundingClientRect();
+                showConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                
+                const newX = Math.random() * (window.innerWidth - 100);
+                const newY = Math.random() * (window.innerHeight - 100);
+                pinata.style.left = `${newX}px`;
+                pinata.style.top = `${newY}px`;
+                pinata.style.transform = `rotate(${Math.random() * 40 - 20}deg)`;
+
+                explosions++;
+            }, 1000);
+        }
+        
+        function showConfetti(x, y) {
+            const isExplosion = (x !== undefined && y !== undefined);
             const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < (isExplosion ? 30 : 100); i++) {
                 const confetti = document.createElement('div');
                 confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + 'vw';
-                confetti.style.top = -20 + 'px'; // Start above the screen
+                confetti.style.left = x ? `${x}px` : (Math.random() * 100 + 'vw');
+                confetti.style.top = y ? `${y}px` : '-20px';
                 confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
-                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                
+                const drift = Math.random() * 200 - 100; // -100px to 100px
+                confetti.style.setProperty('--fall-x-drift', `${drift}px`);
+                
+                confetti.style.animationDelay = Math.random() * 0.2 + 's';
                 confettiContainer.appendChild(confetti);
 
-                // Clean up confetti elements after animation
-                setTimeout(() => {
-                    confetti.remove();
-                }, 5000);
+                setTimeout(() => confetti.remove(), 5000);
             }
         }
 
