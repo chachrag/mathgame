@@ -165,7 +165,7 @@
             <button id="restartBtn" class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 9a9 9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 9a9 9 G-9 G-9 0 0114.13-5.13M20 15a9 9 0 01-14.13 5.13" />
                 </svg>
             </button>
             
@@ -258,6 +258,13 @@
                 <button id="closeAwesomeBtn" class="btn bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Keep Going!</button>
             </div>
         </div>
+
+        <!-- Level Change Modal -->
+        <div id="levelChangeModal" class="modal-overlay hidden">
+            <div class="modal-content text-gray-800 text-center">
+                <h2 id="levelChangeText" class="text-4xl font-bold"></h2>
+            </div>
+        </div>
     </main>
 
     <!-- Confetti Container -->
@@ -290,6 +297,8 @@
         const confettiContainer = document.getElementById('confetti-container');
         const progressBarRed = document.getElementById('progressBarRed');
         const progressBarGreen = document.getElementById('progressBarGreen');
+        const levelChangeModal = document.getElementById('levelChangeModal');
+        const levelChangeText = document.getElementById('levelChangeText');
         
         // Settings Modal Elements
         const settingsBtn = document.getElementById('settingsBtn');
@@ -417,6 +426,9 @@
             gameView.classList.remove('hidden');
             restartBtn.classList.remove('hidden');
             
+            // Reset the "Awesome" modal button for a new game session.
+            closeAwesomeBtn.textContent = 'Keep Going!';
+
             if (settings.showTimer) {
                 timerDisplayEl.classList.remove('hidden');
                 targetTimeLabelEl.textContent = `Target - ${settings.targetTime}s`;
@@ -430,7 +442,7 @@
             levelProgress = 0;
             updateUI();
             generateQuestion();
-            answerEl.blur(); // Remove focus from the answer field on initial start
+            answerEl.focus(); // Set focus to the answer field on initial start
         }
 
         function updateUI() {
@@ -601,30 +613,42 @@
         }
         
         function handleCorrectAnswer(responseTime) {
+            let proceedToNextQuestion = true;
+
             // If timer is off, always treat as fast.
             if (!settings.showTimer || responseTime <= settings.targetTime) {
                 // Correct and Fast
                 score += settings.scoreCorrect;
                 feedbackEl.textContent = 'Correct!';
 
-                // Only calculate progress if not at max level
+                // Calculate progress for all levels.
                 if (currentLevel < 5) {
                     levelProgress = Math.max(0, levelProgress) + 33.34; // Add to positive progress
 
                     if (levelProgress >= 100) {
                         currentLevel++;
-                        feedbackEl.textContent += ' Level up!';
+                        showLevelChangePopup(`Level Up to ${currentLevel}!`);
                         levelProgress = 0;
                     }
+                } else { // At level 5, accumulate progress visually but do not level up.
+                    levelProgress = Math.min(99.9, Math.max(0, levelProgress) + 33.34);
                 }
                 
-                // Check for level 5 streak
+                // Check for level 5 streak (this remains separate)
                 if (currentLevel === 5) {
                     level5Streak++;
-                    if (level5Streak === 3) {
+                    if (level5Streak >= 3) {
+                        // --- WIN CONDITION MET ---
+                        clearInterval(timerInterval);
+                        answerEl.disabled = true;
+                        checkBtn.disabled = true;
+                        
                         showConfetti();
+                        closeAwesomeBtn.textContent = 'Restart Game';
                         awesomeModal.classList.remove('hidden');
-                        level5Streak = 0; // Reset after celebration
+                        
+                        level5Streak = 0; // Reset
+                        proceedToNextQuestion = false; // Stop the game from continuing
                     }
                 } else {
                     level5Streak = 0; // Reset if level is not 5
@@ -645,6 +669,7 @@
 
                     if (levelProgress <= -100) {
                         currentLevel--;
+                        showLevelChangePopup(`Level Down to ${currentLevel}!`);
                         feedbackEl.textContent = 'Correct, but slow. Level down.';
                         levelProgress = 0;
                     }
@@ -655,7 +680,10 @@
             }
             
             feedbackEl.className = 'feedback mt-4 text-xl font-semibold text-green-600';
-            setTimeout(generateQuestion, settings.transitionTime * 1000);
+            
+            if (proceedToNextQuestion) {
+                setTimeout(generateQuestion, settings.transitionTime * 1000);
+            }
         }
 
         function handleIncorrectAnswer() {
@@ -673,6 +701,7 @@
 
                 if (levelProgress <= -100) {
                     currentLevel--;
+                    showLevelChangePopup(`Level Down to ${currentLevel}!`);
                     feedbackText += ' Level down.';
                     levelProgress = 0;
                 }
@@ -710,6 +739,7 @@
 
                 if (levelProgress <= -100) {
                     currentLevel--;
+                    showLevelChangePopup(`Level Down to ${currentLevel}!`);
                     feedbackText += ' Level down.';
                     levelProgress = 0;
                 }
@@ -743,6 +773,31 @@
                     confetti.remove();
                 }, 5000);
             }
+        }
+
+        function showLevelChangePopup(message) {
+            levelChangeText.textContent = message;
+            const modalContent = levelChangeModal.querySelector('.modal-content');
+            
+            const levelColors = {
+                1: 'bg-gray-300',
+                2: 'bg-blue-200',
+                3: 'bg-green-200',
+                4: 'bg-yellow-200',
+                5: 'bg-red-200'
+            };
+            const allPossibleColors = Object.values(levelColors);
+            const newColor = levelColors[currentLevel] || 'bg-gray-300';
+
+            modalContent.classList.remove(...allPossibleColors);
+            modalContent.classList.add(newColor);
+            
+            levelChangeModal.classList.remove('hidden');
+            
+            // Hide the popup after the transition time.
+            setTimeout(() => {
+                levelChangeModal.classList.add('hidden');
+            }, settings.transitionTime * 1000);
         }
 
         // --- Utility & Difficulty Functions ---
@@ -874,7 +929,7 @@
         answerEl.addEventListener('keyup', (event) => { if (event.key === 'Enter') checkAnswer(); });
         nextBtn.addEventListener('click', () => {
             generateQuestion();
-            answerEl.blur();
+            answerEl.focus();
         });
         
         // Settings Modal Listeners
@@ -884,7 +939,15 @@
         });
         closeSettingsBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
         saveSettingsBtn.addEventListener('click', saveSettings);
-        closeAwesomeBtn.addEventListener('click', () => awesomeModal.classList.add('hidden'));
+        if (closeAwesomeBtn) {
+            closeAwesomeBtn.addEventListener('click', () => {
+                awesomeModal.classList.add('hidden');
+                // If the game has been won, the button will now restart the game.
+                if (closeAwesomeBtn.textContent === 'Restart Game') {
+                    initializeApp();
+                }
+            });
+        }
         settingsCheckboxes.showTimer.addEventListener('change', toggleTimerSettingsVisibility);
 
         // --- Initial Load ---
